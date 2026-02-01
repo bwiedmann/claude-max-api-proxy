@@ -3,9 +3,19 @@
  * Used for Clawdbot integration
  */
 
+/**
+ * A single content part in a multi-part message.
+ * See: https://platform.openai.com/docs/api-reference/chat/create#chat-create-messages
+ */
+export interface OpenAIContentPart {
+  type: "text" | "image_url";
+  text?: string;
+  image_url?: { url: string; detail?: string };
+}
+
 export interface OpenAIChatMessage {
   role: "system" | "user" | "assistant";
-  content: string;
+  content: string | OpenAIContentPart[];
 }
 
 export interface OpenAIChatRequest {
