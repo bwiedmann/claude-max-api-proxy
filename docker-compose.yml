@@ -1,0 +1,20 @@
+services:
+  claudeproxy:
+    build: .
+    image: claude-max-api-proxy:latest
+    environment:
+      PORT: "3456"
+      HOST: "0.0.0.0"
+      HOME: "/data"
+      XDG_CONFIG_HOME: "/data/.config"
+      XDG_DATA_HOME: "/data/.local/share"
+      XDG_STATE_HOME: "/data/.local/state"
+      XDG_CACHE_HOME: "/data/.cache"
+      # LOG_DIR: "/data/logs"  # Optional: write logs to a file on the volume
+    volumes:
+      - claudeproxy_data:/data
+    ports:
+      - "3456:3456"
+
+volumes:
+  claudeproxy_data:
