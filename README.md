@@ -162,6 +162,36 @@ response = client.chat.completions.create(
 )
 ```
 
+### OpenClaw (Docker)
+
+When running this provider in Docker, point OpenClaw at the host IP and mapped port:
+
+```json
+{
+  "models": {
+    "mode": "merge",
+    "providers": {
+      "claude-proxy": {
+        "baseUrl": "http://<ip>:3456/v1",
+        "apiKey": "proxy",
+        "api": "openai-completions",
+        "models": [
+          {
+            "id": "claude-sonnet-4",
+            "name": "claude-sonnet-4",
+            "reasoning": false,
+            "input": ["text"],
+            "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+            "contextWindow": 200000,
+            "maxTokens": 8192
+          }
+        ]
+      }
+    }
+  }
+}
+```
+
 ## Auto-Start on macOS
 
 Create a LaunchAgent to start the provider automatically on login. See `docs/macos-setup.md` for detailed instructions.
@@ -203,6 +233,87 @@ src/
 | **Monthly Total** | **~$52.50** | **$0 extra** |
 
 If you're already paying for Claude Max, this provider lets you use that subscription for API-style access at no additional cost.
+
+## Docker (Recommended)
+
+This project ships with a production-ready Docker image that includes Claude CLI and keeps all data, config, and auth secrets on a persistent volume. The container itself remains stateless and safe to replace.
+
+### Build
+
+```bash
+docker build -t claude-max-api-proxy:latest .
+```
+
+### One-time Claude CLI login (persists on volume)
+
+Claude CLI uses OAuth. You must run the login once, then the credentials are stored on the volume and survive container upgrades.
+
+```bash
+docker run --rm -it \
+  -v claudeproxy_data:/data \
+  claude-max-api-proxy:latest \
+  claude auth login
+```
+
+### Run
+
+```bash
+docker run -d --name claudeproxy \
+  -p 3456:3456 \
+  -v claudeproxy_data:/data \
+  claude-max-api-proxy:latest
+```
+
+### Custom Port
+
+```bash
+docker run -d --name claudeproxy \
+  -e PORT=8080 -p 8080:8080 \
+  -v claudeproxy_data:/data \
+  claude-max-api-proxy:latest
+```
+
+### Docker Compose
+
+```bash
+docker compose up -d --build
+```
+
+Edit `docker-compose.yml` to change the exposed port.
+
+### Where data, config, and secrets live
+
+All runtime state is redirected to `/data` inside the container and should be mounted to a persistent volume:
+
+- `HOME=/data`
+- `XDG_CONFIG_HOME=/data/.config`
+- `XDG_DATA_HOME=/data/.local/share`
+- `XDG_STATE_HOME=/data/.local/state`
+- `XDG_CACHE_HOME=/data/.cache`
+
+This ensures:
+- Claude CLI OAuth secrets persist across container updates.
+- Session mappings (`.claude-code-cli-sessions.json`) persist.
+- The container filesystem stays stateless.
+
+### Logs
+
+By default, logs go to stdout/stderr (preferred for container environments and avoids disk growth).  
+If you want file logs on the volume:
+
+```bash
+docker run -d --name claudeproxy \
+  -e LOG_DIR=/data/logs \
+  -p 3456:3456 \
+  -v claudeproxy_data:/data \
+  claude-max-api-proxy:latest
+```
+
+### Health Check
+
+```bash
+curl http://localhost:3456/health
+```
 
 ## Troubleshooting
 
