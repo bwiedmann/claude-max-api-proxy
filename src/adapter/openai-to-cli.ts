@@ -13,6 +13,8 @@ export interface CliInput {
   prompt: string;
   model: ClaudeModel;
   sessionId?: string;
+  systemPrompt?: string;
+  tools?: string[];
 }
 
 const MODEL_MAP: Record<string, ClaudeModel> = {
@@ -76,45 +78,75 @@ export function extractContent(
 }
 
 /**
- * Convert OpenAI messages array to a single prompt string for Claude CLI
+ * Extract system messages and conversation from OpenAI messages array
  *
- * Claude Code CLI in --print mode expects a single prompt, not a conversation.
- * We format the messages into a readable format that preserves context.
+ * System messages should be passed via --append-system-prompt flag,
+ * not embedded in the user prompt (more reliable for OpenClaw integration).
  */
-export function messagesToPrompt(messages: OpenAIChatRequest["messages"]): string {
-  const parts: string[] = [];
+export function extractMessagesContent(messages: OpenAIChatRequest["messages"]): {
+  systemPrompt: string | undefined;
+  conversationPrompt: string;
+} {
+  const systemParts: string[] = [];
+  const conversationParts: string[] = [];
 
   for (const msg of messages) {
     const text = extractContent(msg.content);
 
     switch (msg.role) {
       case "system":
-        // System messages become context instructions
-        parts.push(`<system>\n${text}\n</system>\n`);
+      case "developer":
+        // System/developer messages go to --append-system-prompt flag
+        // "developer" is OpenAI's newer role for system-level instructions
+        systemParts.push(text);
         break;
 
       case "user":
         // User messages are the main prompt
-        parts.push(text);
+        conversationParts.push(text);
         break;
 
       case "assistant":
         // Previous assistant responses for context
-        parts.push(`<previous_response>\n${text}\n</previous_response>\n`);
+        conversationParts.push(`<previous_response>\n${text}\n</previous_response>\n`);
         break;
     }
   }
 
-  return parts.join("\n").trim();
+  return {
+    systemPrompt: systemParts.length > 0 ? systemParts.join("\n\n").trim() : undefined,
+    conversationPrompt: conversationParts.join("\n").trim(),
+  };
+}
+
+/**
+ * Convert OpenAI messages array to a single prompt string for Claude CLI
+ *
+ * @deprecated Use extractMessagesContent instead for better system prompt handling
+ */
+export function messagesToPrompt(messages: OpenAIChatRequest["messages"]): string {
+  const { systemPrompt, conversationPrompt } = extractMessagesContent(messages);
+
+  if (systemPrompt) {
+    return `<system>\n${systemPrompt}\n</system>\n\n${conversationPrompt}`;
+  }
+
+  return conversationPrompt;
 }
 
 /**
  * Convert OpenAI chat request to CLI input format
  */
 export function openaiToCli(request: OpenAIChatRequest): CliInput {
+  const { systemPrompt, conversationPrompt } = extractMessagesContent(request.messages);
+
   return {
-    prompt: messagesToPrompt(request.messages),
+    prompt: conversationPrompt,
     model: extractModel(request.model),
     sessionId: request.user, // Use OpenAI's user field for session mapping
+    systemPrompt,
+    // TODO: Extract tool names from request.tools and map to Claude Code tool names
+    // For now, let Claude Code use all its builtin tools
+    tools: undefined,
   };
 }
