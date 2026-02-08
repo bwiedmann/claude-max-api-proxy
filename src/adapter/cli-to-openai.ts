@@ -63,6 +63,33 @@ export function createDoneChunk(requestId: string, model: string): OpenAIChatChu
 }
 
 /**
+ * Ensure content is always a string (defensive against unexpected types)
+ */
+function ensureString(value: unknown): string {
+  if (typeof value === "string") {
+    return value;
+  }
+  if (value === null || value === undefined) {
+    return "";
+  }
+  // If it's an object, try to extract text content or stringify it
+  if (typeof value === "object") {
+    // Handle potential content array format
+    if (Array.isArray(value)) {
+      return value
+        .filter((item): item is { type: string; text: string } =>
+          item && typeof item === "object" && item.type === "text" && typeof item.text === "string"
+        )
+        .map((item) => item.text)
+        .join("");
+    }
+    // Last resort: stringify the object
+    return JSON.stringify(value);
+  }
+  return String(value);
+}
+
+/**
  * Convert Claude CLI result to OpenAI non-streaming response
  */
 export function cliResultToOpenai(
@@ -74,6 +101,9 @@ export function cliResultToOpenai(
     ? Object.keys(result.modelUsage)[0]
     : "claude-sonnet-4";
 
+  // Ensure content is always a string to prevent [object Object] issues
+  const content = ensureString(result.result);
+
   return {
     id: `chatcmpl-${requestId}`,
     object: "chat.completion",
@@ -84,7 +114,7 @@ export function cliResultToOpenai(
         index: 0,
         message: {
           role: "assistant",
-          content: result.result,
+          content,
         },
         finish_reason: "stop",
       },

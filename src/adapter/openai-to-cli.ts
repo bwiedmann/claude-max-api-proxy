@@ -47,6 +47,44 @@ export function extractModel(model: string): ClaudeModel {
 }
 
 /**
+ * Extract text from message content (handles both string and array formats)
+ *
+ * OpenAI API allows content to be:
+ * - A string: "Hello"
+ * - An array of content parts: [{"type": "text", "text": "Hello"}]
+ */
+function extractContentText(content: unknown): string {
+  // Simple string content
+  if (typeof content === "string") {
+    return content;
+  }
+
+  // Array of content parts (multi-modal format)
+  if (Array.isArray(content)) {
+    return content
+      .filter((part): part is { type: string; text: string } =>
+        part && typeof part === "object" && part.type === "text" && typeof part.text === "string"
+      )
+      .map((part) => part.text)
+      .join("");
+  }
+
+  // Null/undefined
+  if (content === null || content === undefined) {
+    return "";
+  }
+
+  // Unknown object - try to stringify as last resort
+  if (typeof content === "object") {
+    console.error("[extractContentText] Unexpected object content:", JSON.stringify(content).slice(0, 200));
+    return JSON.stringify(content);
+  }
+
+  // Other types - convert to string
+  return String(content);
+}
+
+/**
  * Convert OpenAI messages array to a single prompt string for Claude CLI
  *
  * Claude Code CLI in --print mode expects a single prompt, not a conversation.
@@ -56,20 +94,22 @@ export function messagesToPrompt(messages: OpenAIChatRequest["messages"]): strin
   const parts: string[] = [];
 
   for (const msg of messages) {
+    const textContent = extractContentText(msg.content);
+
     switch (msg.role) {
       case "system":
         // System messages become context instructions
-        parts.push(`<system>\n${msg.content}\n</system>\n`);
+        parts.push(`<system>\n${textContent}\n</system>\n`);
         break;
 
       case "user":
         // User messages are the main prompt
-        parts.push(msg.content);
+        parts.push(textContent);
         break;
 
       case "assistant":
         // Previous assistant responses for context
-        parts.push(`<previous_response>\n${msg.content}\n</previous_response>\n`);
+        parts.push(`<previous_response>\n${textContent}\n</previous_response>\n`);
         break;
     }
   }
