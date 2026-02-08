@@ -101,8 +101,11 @@ export function cliResultToOpenai(
 /**
  * Normalize Claude model names to a consistent format
  * e.g., "claude-sonnet-4-5-20250929" -> "claude-sonnet-4"
+ * 
+ * Handles undefined model (e.g., when rate limit is hit and modelUsage is empty)
  */
-function normalizeModelName(model: string): string {
+function normalizeModelName(model: string | undefined): string {
+  if (!model) return "claude-sonnet-4";
   if (model.includes("opus")) return "claude-opus-4";
   if (model.includes("sonnet")) return "claude-sonnet-4";
   if (model.includes("haiku")) return "claude-haiku-4";

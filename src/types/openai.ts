@@ -3,9 +3,24 @@
  * Used for Clawdbot integration
  */
 
+// Content can be a string or array of content parts (multimodal)
+export interface OpenAITextContentPart {
+  type: "text";
+  text: string;
+}
+
+export interface OpenAIImageContentPart {
+  type: "image_url";
+  image_url: {
+    url: string;
+  };
+}
+
+export type OpenAIContentPart = OpenAITextContentPart | OpenAIImageContentPart;
+
 export interface OpenAIChatMessage {
-  role: "system" | "user" | "assistant";
-  content: string;
+  role: "system" | "developer" | "user" | "assistant";
+  content: string | OpenAIContentPart[];
 }
 
 export interface OpenAIChatRequest {
