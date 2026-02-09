@@ -140,6 +140,14 @@ export class ClaudeSubprocess extends EventEmitter {
       prompt, // Pass prompt as argument (more reliable than stdin)
     ];
 
+    // Allow skipping permission prompts via environment variable.
+    // This delegates security controls to the calling application (e.g., an
+    // orchestration layer that already handles permissions), making the proxy
+    // behave consistently with direct API access.
+    if (process.env.CLAUDE_DANGEROUSLY_SKIP_PERMISSIONS === "true") {
+      args.push("--dangerously-skip-permissions");
+    }
+
     if (options.sessionId) {
       args.push("--session-id", options.sessionId);
     }
