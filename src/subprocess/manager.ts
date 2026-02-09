@@ -43,17 +43,25 @@ export class ClaudeSubprocess extends EventEmitter {
   private isKilled: boolean = false;
 
   /**
-   * Start the Claude CLI subprocess with the given prompt
+   * Start the Claude CLI subprocess.
+   *
+   * Two modes:
+   * - Text mode (stdinMessages omitted): prompt passed as CLI argument
+   * - Stream-JSON mode (stdinMessages provided): messages piped via stdin (supports images)
    */
-  async start(prompt: string, options: SubprocessOptions): Promise<void> {
-    const args = this.buildArgs(prompt, options);
+  async start(
+    prompt: string,
+    options: SubprocessOptions & { stdinMessages?: string[] }
+  ): Promise<void> {
+    const useStreamInput = !!options.stdinMessages?.length;
+    const args = this.buildArgs(useStreamInput ? null : prompt, options, useStreamInput);
     const timeout = options.timeout || DEFAULT_TIMEOUT;
 
     return new Promise((resolve, reject) => {
       try {
         // Use spawn() for security - no shell interpretation
         this.process = spawn("claude", args, {
-          cwd: options.cwd || process.cwd(),
+          cwd: options.cwd || "/tmp", // Use neutral dir to avoid loading CLAUDE.md
           env: { ...process.env },
           stdio: ["pipe", "pipe", "pipe"],
         });
@@ -81,10 +89,18 @@ export class ClaudeSubprocess extends EventEmitter {
           }
         });
 
-        // Close stdin since we pass prompt as argument
+        // Pipe messages via stdin or close it
+        if (useStreamInput && options.stdinMessages) {
+          for (const line of options.stdinMessages) {
+            this.process.stdin?.write(line + "\n");
+          }
+        }
         this.process.stdin?.end();
 
-        console.error(`[Subprocess] Process spawned with PID: ${this.process.pid}`);
+        console.error(
+          `[Subprocess] Process spawned with PID: ${this.process.pid}` +
+          ` (mode: ${useStreamInput ? "stream-json" : "text"})`
+        );
 
         // Parse JSON stream from stdout
         this.process.stdout?.on("data", (chunk: Buffer) => {
@@ -98,8 +114,6 @@ export class ClaudeSubprocess extends EventEmitter {
         this.process.stderr?.on("data", (chunk: Buffer) => {
           const errorText = chunk.toString().trim();
           if (errorText) {
-            // Don't emit as error unless it's actually an error
-            // Claude CLI may write debug info to stderr
             console.error("[Subprocess stderr]:", errorText.slice(0, 200));
           }
         });
@@ -108,14 +122,12 @@ export class ClaudeSubprocess extends EventEmitter {
         this.process.on("close", (code) => {
           console.error(`[Subprocess] Process closed with code: ${code}`);
           this.clearTimeout();
-          // Process any remaining buffer
           if (this.buffer.trim()) {
             this.processBuffer();
           }
           this.emit("close", code);
         });
 
-        // Resolve immediately since we're streaming
         resolve();
       } catch (err) {
         this.clearTimeout();
@@ -125,9 +137,16 @@ export class ClaudeSubprocess extends EventEmitter {
   }
 
   /**
-   * Build CLI arguments array
+   * Build CLI arguments array.
+   * @param prompt - Text prompt (null when using stream-json input)
+   * @param options - Subprocess options
+   * @param streamInput - Whether to use --input-format stream-json
    */
-  private buildArgs(prompt: string, options: SubprocessOptions): string[] {
+  private buildArgs(
+    prompt: string | null,
+    options: SubprocessOptions,
+    streamInput: boolean
+  ): string[] {
     const args = [
       "--print", // Non-interactive mode
       "--output-format",
@@ -137,8 +156,17 @@ export class ClaudeSubprocess extends EventEmitter {
       "--model",
       options.model, // Model alias (opus/sonnet/haiku)
       "--no-session-persistence", // Don't save sessions
-      prompt, // Pass prompt as argument (more reliable than stdin)
+      "--tools", "", // Disable all tools — act as a plain chat model
+      "--disable-slash-commands", // Disable skills
+      "--setting-sources", "", // Don't load any settings files (CLAUDE.md etc.)
+      "--system-prompt", "You are a helpful assistant. Follow the user's instructions precisely. When asked to output JSON, output ONLY raw JSON without markdown code fences.",
     ];
+
+    if (streamInput) {
+      args.push("--input-format", "stream-json");
+    } else if (prompt) {
+      args.push(prompt);
+    }
 
     if (options.sessionId) {
       args.push("--session-id", options.sessionId);

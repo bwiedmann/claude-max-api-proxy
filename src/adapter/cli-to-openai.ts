@@ -6,6 +6,33 @@ import type { ClaudeCliAssistant, ClaudeCliResult } from "../types/claude-cli.js
 import type { OpenAIChatResponse, OpenAIChatChunk } from "../types/openai.js";
 
 /**
+ * Extract JSON content from model response.
+ * Claude often outputs prose before/after JSON in code fences.
+ * This extracts the last JSON code fence block, or falls back to
+ * finding a raw JSON object/array in the text.
+ */
+function stripCodeFences(text: string): string {
+  // Find all code fence blocks and take the last one (most likely the JSON)
+  const fenceMatches = [...text.matchAll(/```(?:\w*)\n([\s\S]*?)\n```/g)];
+  if (fenceMatches.length > 0) {
+    return fenceMatches[fenceMatches.length - 1][1];
+  }
+
+  // Try to extract a raw JSON object or array
+  const jsonMatch = text.match(/(\{[\s\S]*\}|\[[\s\S]*\])/);
+  if (jsonMatch) {
+    try {
+      JSON.parse(jsonMatch[1]);
+      return jsonMatch[1];
+    } catch {
+      // Not valid JSON, return original
+    }
+  }
+
+  return text;
+}
+
+/**
  * Extract text content from Claude CLI assistant message
  */
 export function extractTextContent(message: ClaudeCliAssistant): string {
@@ -84,7 +111,7 @@ export function cliResultToOpenai(
         index: 0,
         message: {
           role: "assistant",
-          content: result.result,
+          content: stripCodeFences(result.result),
         },
         finish_reason: "stop",
       },
