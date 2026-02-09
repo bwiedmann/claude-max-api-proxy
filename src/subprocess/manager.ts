@@ -46,7 +46,7 @@ export class ClaudeSubprocess extends EventEmitter {
    * Start the Claude CLI subprocess with the given prompt
    */
   async start(prompt: string, options: SubprocessOptions): Promise<void> {
-    const args = this.buildArgs(prompt, options);
+    const args = this.buildArgs(options);
     const timeout = options.timeout || DEFAULT_TIMEOUT;
 
     return new Promise((resolve, reject) => {
@@ -81,8 +81,12 @@ export class ClaudeSubprocess extends EventEmitter {
           }
         });
 
-        // Close stdin since we pass prompt as argument
-        this.process.stdin?.end();
+        // Write prompt to stdin instead of passing as CLI argument
+        // This avoids E2BIG errors when prompts exceed the OS argument size limit
+        if (this.process.stdin) {
+          this.process.stdin.write(prompt);
+          this.process.stdin.end();
+        }
 
         console.error(`[Subprocess] Process spawned with PID: ${this.process.pid}`);
 
@@ -126,8 +130,9 @@ export class ClaudeSubprocess extends EventEmitter {
 
   /**
    * Build CLI arguments array
+   * Note: prompt is passed via stdin to avoid E2BIG errors with large prompts
    */
-  private buildArgs(prompt: string, options: SubprocessOptions): string[] {
+  private buildArgs(options: SubprocessOptions): string[] {
     const args = [
       "--print", // Non-interactive mode
       "--output-format",
@@ -137,7 +142,6 @@ export class ClaudeSubprocess extends EventEmitter {
       "--model",
       options.model, // Model alias (opus/sonnet/haiku)
       "--no-session-persistence", // Don't save sessions
-      prompt, // Pass prompt as argument (more reliable than stdin)
     ];
 
     if (options.sessionId) {
