@@ -20,15 +20,27 @@ export interface CliInput {
 const MODEL_MAP: Record<string, ClaudeModel> = {
   // Direct model names
   "claude-opus-4": "opus",
+  "claude-opus-4-6": "opus",
   "claude-sonnet-4": "sonnet",
+  "claude-sonnet-4-5": "sonnet",
   "claude-haiku-4": "haiku",
   // With provider prefix
   "claude-code-cli/claude-opus-4": "opus",
+  "claude-code-cli/claude-opus-4-6": "opus",
   "claude-code-cli/claude-sonnet-4": "sonnet",
+  "claude-code-cli/claude-sonnet-4-5": "sonnet",
   "claude-code-cli/claude-haiku-4": "haiku",
+  // Claude-max prefix (from OpenClaw config)
+  "claude-max/claude-opus-4": "opus",
+  "claude-max/claude-opus-4-6": "opus",
+  "claude-max/claude-sonnet-4": "sonnet",
+  "claude-max/claude-sonnet-4-5": "sonnet",
+  "claude-max/claude-haiku-4": "haiku",
   // Aliases
   "opus": "opus",
+  "opus-max": "opus",
   "sonnet": "sonnet",
+  "sonnet-max": "sonnet",
   "haiku": "haiku",
 };
 
