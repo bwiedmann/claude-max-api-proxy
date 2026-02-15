@@ -95,8 +95,24 @@ export class ClaudeSubprocess extends EventEmitter {
           }
         });
 
-        // Close stdin since we pass prompt as argument
-        this.process.stdin?.end();
+        // Write prompt to stdin instead of passing as argument (avoids ENAMETOOLONG on Windows)
+        // If system prompt is large, prepend it to the prompt instead of using --append-system-prompt
+        if (this.process.stdin) {
+          let fullPrompt = prompt;
+          
+          // If we have a system prompt that wasn't added via CLI args (because it's too long),
+          // prepend it to the prompt with XML tags
+          if (options.systemPrompt && options.systemPrompt.length > 8000) {
+            fullPrompt = `<system>\n${options.systemPrompt}\n</system>\n\n${prompt}`;
+            this.debug(`[Subprocess] System prompt too long (${options.systemPrompt.length} chars), prepending to stdin instead of CLI arg`);
+          }
+          
+          this.debug(`[Subprocess] Writing ${fullPrompt.length} chars to stdin`);
+          this.debug(`[Subprocess] Prompt preview (first 500 chars):\n${fullPrompt.slice(0, 500)}`);
+          this.debug(`[Subprocess] Prompt preview (last 500 chars):\n${fullPrompt.slice(-500)}`);
+          this.process.stdin.write(fullPrompt + "\n");
+          this.process.stdin.end();
+        }
 
         this.debug(`[Subprocess] Process spawned with PID: ${this.process.pid}`);
 
@@ -155,10 +171,16 @@ export class ClaudeSubprocess extends EventEmitter {
     ];
 
     // Add system prompt if provided (backstory/memories from OpenClaw)
+    // Only use --append-system-prompt for short system prompts to avoid ENAMETOOLONG on Windows
+    // Long system prompts (>8000 chars) are prepended to stdin instead
     if (options.systemPrompt) {
       this.debug(`[Subprocess] System prompt: ${options.systemPrompt.length} chars`);
-      this.debug(`[Subprocess] System prompt content:\n${options.systemPrompt}`);
-      args.push("--append-system-prompt", options.systemPrompt);
+      if (options.systemPrompt.length <= 8000) {
+        this.debug(`[Subprocess] Adding system prompt via --append-system-prompt (short enough for CLI)`);
+        args.push("--append-system-prompt", options.systemPrompt);
+      } else {
+        this.debug(`[Subprocess] System prompt too long for CLI arg, will prepend to stdin`);
+      }
     } else {
       this.debug("[Subprocess] NO system prompt provided");
     }
@@ -172,8 +194,8 @@ export class ClaudeSubprocess extends EventEmitter {
       args.push("--session-id", options.sessionId);
     }
 
-    // Prompt goes last
-    args.push(prompt);
+    // Prompt is passed via stdin to avoid ENAMETOOLONG error
+    // (not as CLI argument)
 
     return args;
   }

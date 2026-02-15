@@ -175,12 +175,14 @@ async function handleStreamingResponse(
       resolve();
     });
 
-    // Start the subprocess
+    // Start the subprocess with OpenClaw workspace as cwd
+    const workspacePath = process.env.OPENCLAW_WORKSPACE || process.env.CLAWDBOT_WORKSPACE;
     subprocess.start(cliInput.prompt, {
       model: cliInput.model,
       sessionId: cliInput.sessionId,
       systemPrompt: cliInput.systemPrompt,
       tools: cliInput.tools,
+      cwd: workspacePath,
     }).catch((err) => {
       console.error("[Streaming] Subprocess start error:", err);
       reject(err);
@@ -231,13 +233,15 @@ async function handleNonStreamingResponse(
       resolve();
     });
 
-    // Start the subprocess
+    // Start the subprocess with OpenClaw workspace as cwd
+    const workspacePath = process.env.OPENCLAW_WORKSPACE || process.env.CLAWDBOT_WORKSPACE;
     subprocess
       .start(cliInput.prompt, {
         model: cliInput.model,
         sessionId: cliInput.sessionId,
         systemPrompt: cliInput.systemPrompt,
         tools: cliInput.tools,
+        cwd: workspacePath,
       })
       .catch((error) => {
         res.status(500).json({
@@ -262,7 +266,19 @@ export function handleModels(_req: Request, res: Response): void {
     object: "list",
     data: [
       {
+        id: "claude-opus-4-6",
+        object: "model",
+        owned_by: "anthropic",
+        created: Math.floor(Date.now() / 1000),
+      },
+      {
         id: "claude-opus-4",
+        object: "model",
+        owned_by: "anthropic",
+        created: Math.floor(Date.now() / 1000),
+      },
+      {
+        id: "claude-sonnet-4-5",
         object: "model",
         owned_by: "anthropic",
         created: Math.floor(Date.now() / 1000),
