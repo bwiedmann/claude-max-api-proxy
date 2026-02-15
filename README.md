@@ -120,15 +120,59 @@ curl -N -X POST http://localhost:3456/v1/chat/completions \
 
 ## Configuration with Popular Tools
 
-### Clawdbot
+### OpenClaw / Clawdbot
 
-Clawdbot has **built-in support** for Claude CLI OAuth! Check your config:
+Add the following to your `~/.openclaw/openclaw.json` (or equivalent config file):
 
-```bash
-clawdbot models status
+```json
+{
+  "models": {
+    "providers": {
+      "claude-max-proxy": {
+        "baseUrl": "http://localhost:3456/v1",
+        "apiKey": "not-needed",
+        "api": "openai-completions",
+        "models": [
+          {
+            "id": "claude-opus-4",
+            "name": "Claude Opus 4 (via Max Proxy)",
+            "reasoning": true,
+            "input": ["text"],
+            "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+            "contextWindow": 200000,
+            "maxTokens": 32000
+          },
+          {
+            "id": "claude-sonnet-4",
+            "name": "Claude Sonnet 4 (via Max Proxy)",
+            "reasoning": true,
+            "input": ["text"],
+            "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+            "contextWindow": 200000,
+            "maxTokens": 32000
+          }
+        ]
+      }
+    }
+  },
+  "agents": {
+    "defaults": {
+      "model": {
+        "primary": "claude-max-proxy/claude-opus-4"
+      },
+      "models": {
+        "claude-max-proxy/claude-opus-4": { "alias": "opus4" },
+        "claude-max-proxy/claude-sonnet-4": { "alias": "sonnet4" }
+      }
+    }
+  }
+}
 ```
 
-If you see `anthropic:claude-cli=OAuth`, you're already using your Max subscription.
+**Important:** Make sure the proxy server is running before starting OpenClaw:
+```bash
+claude-max-api  # or: node dist/server/standalone.js
+```
 
 ### Continue.dev
 

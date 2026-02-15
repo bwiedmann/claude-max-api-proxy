@@ -28,6 +28,21 @@ export async function handleChatCompletions(
   const body = req.body as OpenAIChatRequest;
   const stream = body.stream === true;
 
+  // Debug: Log incoming request for diagnostics
+  console.error(`[Request ${requestId}] Incoming request:`, JSON.stringify({
+    model: body.model,
+    stream: body.stream,
+    messageCount: body.messages?.length,
+    messages: body.messages?.map((m, i) => ({
+      index: i,
+      role: m.role,
+      contentType: typeof m.content,
+      contentPreview: typeof m.content === 'string'
+        ? m.content.slice(0, 100)
+        : JSON.stringify(m.content).slice(0, 100)
+    }))
+  }));
+
   try {
     // Validate request
     if (!body.messages || !Array.isArray(body.messages) || body.messages.length === 0) {
@@ -109,7 +124,9 @@ async function handleStreamingResponse(
 
     // Handle streaming content deltas
     subprocess.on("content_delta", (event: ClaudeCliStreamEvent) => {
-      const text = event.event.delta?.text || "";
+      // Defensive: ensure text is always a string
+      const rawText = event.event.delta?.text;
+      const text = typeof rawText === "string" ? rawText : (rawText ? String(rawText) : "");
       if (text && !res.writableEnded) {
         const chunk = {
           id: `chatcmpl-${requestId}`,
@@ -135,8 +152,12 @@ async function handleStreamingResponse(
       lastModel = message.message.model;
     });
 
-    subprocess.on("result", (_result: ClaudeCliResult) => {
+    subprocess.on("result", (result: ClaudeCliResult) => {
       isComplete = true;
+      // Debug: log result type for diagnostics
+      if (typeof result.result !== "string") {
+        console.error(`[Streaming] WARNING: result.result is not a string, type: ${typeof result.result}`);
+      }
       if (!res.writableEnded) {
         // Send final done chunk with finish_reason
         const doneChunk = createDoneChunk(requestId, lastModel);

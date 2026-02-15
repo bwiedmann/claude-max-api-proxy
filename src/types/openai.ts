@@ -18,9 +18,11 @@ export interface OpenAIImageContentPart {
 
 export type OpenAIContentPart = OpenAITextContentPart | OpenAIImageContentPart;
 
+export type OpenAIMessageContent = string | OpenAIContentPart[];
+
 export interface OpenAIChatMessage {
   role: "system" | "developer" | "user" | "assistant";
-  content: string | OpenAIContentPart[];
+  content: OpenAIMessageContent;
 }
 
 export interface OpenAIChatRequest {
