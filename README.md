@@ -339,6 +339,20 @@ Check that the Claude CLI is in your PATH:
 which claude
 ```
 
+### Enable debug logging
+
+To troubleshoot subprocess issues, enable detailed debug logging:
+```bash
+DEBUG_SUBPROCESS=true node dist/server/standalone.js
+```
+
+This will log:
+- Subprocess spawn events and PIDs
+- Stdout/stderr data flow
+- System prompt content
+- Assistant messages and results
+- Process exit codes
+
 ## Contributing
 
 Contributions welcome! Please submit PRs with tests.

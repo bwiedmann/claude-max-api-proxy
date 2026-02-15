@@ -14,7 +14,7 @@ export interface OpenAIContentPart {
 }
 
 export interface OpenAIChatMessage {
-  role: "system" | "user" | "assistant";
+  role: "system" | "developer" | "user" | "assistant";
   content: string | OpenAIContentPart[];
 }
 
