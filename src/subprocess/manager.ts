@@ -60,7 +60,7 @@ export class ClaudeSubprocess extends EventEmitter {
    * Start the Claude CLI subprocess with the given prompt
    */
   async start(prompt: string, options: SubprocessOptions): Promise<void> {
-    const args = this.buildArgs(prompt, options);
+    const args = this.buildArgs(options);
     const timeout = options.timeout || DEFAULT_TIMEOUT;
 
     return new Promise((resolve, reject) => {
@@ -95,22 +95,21 @@ export class ClaudeSubprocess extends EventEmitter {
           }
         });
 
-        // Write prompt to stdin instead of passing as argument (avoids ENAMETOOLONG on Windows)
+        // Write prompt to stdin instead of passing as CLI argument
+        // This avoids E2BIG errors when prompts exceed the OS argument size limit
         // If system prompt is large, prepend it to the prompt instead of using --append-system-prompt
         if (this.process.stdin) {
           let fullPrompt = prompt;
-          
+
           // If we have a system prompt that wasn't added via CLI args (because it's too long),
           // prepend it to the prompt with XML tags
           if (options.systemPrompt && options.systemPrompt.length > 8000) {
             fullPrompt = `<system>\n${options.systemPrompt}\n</system>\n\n${prompt}`;
             this.debug(`[Subprocess] System prompt too long (${options.systemPrompt.length} chars), prepending to stdin instead of CLI arg`);
           }
-          
+
           this.debug(`[Subprocess] Writing ${fullPrompt.length} chars to stdin`);
-          this.debug(`[Subprocess] Prompt preview (first 500 chars):\n${fullPrompt.slice(0, 500)}`);
-          this.debug(`[Subprocess] Prompt preview (last 500 chars):\n${fullPrompt.slice(-500)}`);
-          this.process.stdin.write(fullPrompt + "\n");
+          this.process.stdin.write(fullPrompt);
           this.process.stdin.end();
         }
 
@@ -156,8 +155,9 @@ export class ClaudeSubprocess extends EventEmitter {
 
   /**
    * Build CLI arguments array
+   * Note: prompt is passed via stdin to avoid E2BIG errors with large prompts
    */
-  private buildArgs(prompt: string, options: SubprocessOptions): string[] {
+  private buildArgs(options: SubprocessOptions): string[] {
     const args = [
       "--print", // Non-interactive mode
       "--output-format",
