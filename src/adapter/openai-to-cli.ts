@@ -61,7 +61,7 @@ export interface CliInput {
 const MODEL_MAP: Record<string, ClaudeModel> = {
   // Direct model names
   "claude-opus-4": "opus",
-  "claude-opus-4-6": "opus", // Note: CLI doesn't have a separate 4.6 model, uses regular opus (200k limit)
+  "claude-opus-4-6": "opus",
   "claude-sonnet-4": "sonnet",
   "claude-sonnet-4-5": "sonnet",
   "claude-haiku-4": "haiku",
@@ -71,9 +71,12 @@ const MODEL_MAP: Record<string, ClaudeModel> = {
   "claude-code-cli/claude-sonnet-4": "sonnet",
   "claude-code-cli/claude-sonnet-4-5": "sonnet",
   "claude-code-cli/claude-haiku-4": "haiku",
-  // Claude-max prefix (from Clawdbot config)
+  // Claude-max prefix (from OpenClaw config)
+  "claude-max/claude-opus-4": "opus",
   "claude-max/claude-opus-4-6": "opus",
+  "claude-max/claude-sonnet-4": "sonnet",
   "claude-max/claude-sonnet-4-5": "sonnet",
+  "claude-max/claude-haiku-4": "haiku",
   // Aliases
   "opus": "opus",
   "sonnet": "sonnet",

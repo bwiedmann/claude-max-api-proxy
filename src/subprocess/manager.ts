@@ -206,8 +206,7 @@ export class ClaudeSubprocess extends EventEmitter {
       args.push("--session-id", options.sessionId);
     }
 
-    // Prompt is passed via stdin to avoid ENAMETOOLONG error
-    // (not as CLI argument)
+    // Prompt is passed via stdin to avoid E2BIG / ENAMETOOLONG errors
 
     return args;
   }

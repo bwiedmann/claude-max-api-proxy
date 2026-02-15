@@ -159,8 +159,16 @@ async function handleStreamingResponse(
         console.error(`[Streaming] WARNING: result.result is not a string, type: ${typeof result.result}`);
       }
       if (!res.writableEnded) {
-        // Send final done chunk with finish_reason
-        const doneChunk = createDoneChunk(requestId, lastModel);
+        // Send final chunk with finish_reason and usage data
+        const doneChunk = {
+          ...createDoneChunk(requestId, lastModel),
+          usage: {
+            prompt_tokens: result.usage?.input_tokens || 0,
+            completion_tokens: result.usage?.output_tokens || 0,
+            total_tokens:
+              (result.usage?.input_tokens || 0) + (result.usage?.output_tokens || 0),
+          },
+        };
         res.write(`data: ${JSON.stringify(doneChunk)}\n\n`);
         res.write("data: [DONE]\n\n");
         res.end();
