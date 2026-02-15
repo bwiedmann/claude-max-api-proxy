@@ -203,6 +203,7 @@ async function handleStreamingResponse(
       sessionId: cliInput.sessionId,
       systemPrompt: cliInput.systemPrompt,
       tools: cliInput.tools,
+      stdinMessages: cliInput.hasImages ? cliInput.stdinMessages : undefined,
       cwd: workspacePath,
     }).catch((err) => {
       console.error("[Streaming] Subprocess start error:", err);
@@ -262,6 +263,7 @@ async function handleNonStreamingResponse(
         sessionId: cliInput.sessionId,
         systemPrompt: cliInput.systemPrompt,
         tools: cliInput.tools,
+        stdinMessages: cliInput.hasImages ? cliInput.stdinMessages : undefined,
         cwd: workspacePath,
       })
       .catch((error) => {

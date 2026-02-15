@@ -22,7 +22,7 @@ function createApp(): Express {
   const app = express();
 
   // Middleware
-  app.use(express.json({ limit: "10mb" }));
+  app.use(express.json({ limit: "50mb" })); // Large limit for base64 images
 
   // Request logging (debug mode)
   app.use((req: Request, _res: Response, next: NextFunction) => {

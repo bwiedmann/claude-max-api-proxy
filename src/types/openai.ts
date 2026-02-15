@@ -13,6 +13,7 @@ export interface OpenAIImageContentPart {
   type: "image_url";
   image_url: {
     url: string;
+    detail?: string;
   };
 }
 

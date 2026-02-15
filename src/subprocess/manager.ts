@@ -57,17 +57,25 @@ export class ClaudeSubprocess extends EventEmitter {
   }
 
   /**
-   * Start the Claude CLI subprocess with the given prompt
+   * Start the Claude CLI subprocess.
+   *
+   * Two modes:
+   * - Text mode (stdinMessages omitted): prompt passed via stdin
+   * - Stream-JSON mode (stdinMessages provided): NDJSON piped via stdin (supports images)
    */
-  async start(prompt: string, options: SubprocessOptions): Promise<void> {
-    const args = this.buildArgs(options);
+  async start(
+    prompt: string,
+    options: SubprocessOptions & { stdinMessages?: string[] }
+  ): Promise<void> {
+    const useStreamInput = !!options.stdinMessages?.length;
+    const args = this.buildArgs(options, useStreamInput);
     const timeout = options.timeout || DEFAULT_TIMEOUT;
 
     return new Promise((resolve, reject) => {
       try {
         // Use spawn() for security - no shell interpretation
         this.process = spawn("claude", args, {
-          cwd: options.cwd || process.cwd(),
+          cwd: options.cwd || "/tmp", // Use neutral dir to avoid loading CLAUDE.md
           env: { ...process.env },
           stdio: ["pipe", "pipe", "pipe"],
         });
@@ -95,25 +103,28 @@ export class ClaudeSubprocess extends EventEmitter {
           }
         });
 
-        // Write prompt to stdin instead of passing as CLI argument
-        // This avoids E2BIG errors when prompts exceed the OS argument size limit
-        // If system prompt is large, prepend it to the prompt instead of using --append-system-prompt
-        if (this.process.stdin) {
+        // Write to stdin based on mode
+        if (useStreamInput && options.stdinMessages) {
+          // Stream-JSON mode: pipe NDJSON messages (supports images)
+          for (const line of options.stdinMessages) {
+            this.process.stdin?.write(line + "\n");
+          }
+        } else {
+          // Text mode: write prompt to stdin
           let fullPrompt = prompt;
 
-          // If we have a system prompt that wasn't added via CLI args (because it's too long),
-          // prepend it to the prompt with XML tags
+          // If system prompt is too long for CLI arg, prepend it to stdin
           if (options.systemPrompt && options.systemPrompt.length > 8000) {
             fullPrompt = `<system>\n${options.systemPrompt}\n</system>\n\n${prompt}`;
-            this.debug(`[Subprocess] System prompt too long (${options.systemPrompt.length} chars), prepending to stdin instead of CLI arg`);
+            this.debug(`[Subprocess] System prompt too long (${options.systemPrompt.length} chars), prepending to stdin`);
           }
 
           this.debug(`[Subprocess] Writing ${fullPrompt.length} chars to stdin`);
-          this.process.stdin.write(fullPrompt);
-          this.process.stdin.end();
+          this.process.stdin?.write(fullPrompt);
         }
+        this.process.stdin?.end();
 
-        this.debug(`[Subprocess] Process spawned with PID: ${this.process.pid}`);
+        this.debug(`[Subprocess] Process spawned with PID: ${this.process.pid} (mode: ${useStreamInput ? "stream-json" : "text"})`);
 
         // Parse JSON stream from stdout
         this.process.stdout?.on("data", (chunk: Buffer) => {
@@ -127,8 +138,6 @@ export class ClaudeSubprocess extends EventEmitter {
         this.process.stderr?.on("data", (chunk: Buffer) => {
           const errorText = chunk.toString().trim();
           if (errorText) {
-            // Don't emit as error unless it's actually an error
-            // Claude CLI may write debug info to stderr
             this.debug("[Subprocess stderr]:", errorText.slice(0, 200));
           }
         });
@@ -137,14 +146,12 @@ export class ClaudeSubprocess extends EventEmitter {
         this.process.on("close", (code) => {
           this.debug(`[Subprocess] Process closed with code: ${code}`);
           this.clearTimeout();
-          // Process any remaining buffer
           if (this.buffer.trim()) {
             this.processBuffer();
           }
           this.emit("close", code);
         });
 
-        // Resolve immediately since we're streaming
         resolve();
       } catch (err) {
         this.clearTimeout();
@@ -154,10 +161,10 @@ export class ClaudeSubprocess extends EventEmitter {
   }
 
   /**
-   * Build CLI arguments array
-   * Note: prompt is passed via stdin to avoid E2BIG errors with large prompts
+   * Build CLI arguments array.
+   * Prompt is passed via stdin (text mode) or as NDJSON (stream-json mode).
    */
-  private buildArgs(options: SubprocessOptions): string[] {
+  private buildArgs(options: SubprocessOptions, streamInput: boolean): string[] {
     const args = [
       "--print", // Non-interactive mode
       "--output-format",
@@ -170,8 +177,13 @@ export class ClaudeSubprocess extends EventEmitter {
       "--dangerously-skip-permissions", // Allow file operations (running as service)
     ];
 
+    // Add stream-json input format when images are present
+    if (streamInput) {
+      args.push("--input-format", "stream-json");
+    }
+
     // Add system prompt if provided (backstory/memories from OpenClaw)
-    // Only use --append-system-prompt for short system prompts to avoid ENAMETOOLONG on Windows
+    // Only use --append-system-prompt for short system prompts to avoid ENAMETOOLONG
     // Long system prompts (>8000 chars) are prepended to stdin instead
     if (options.systemPrompt) {
       this.debug(`[Subprocess] System prompt: ${options.systemPrompt.length} chars`);
