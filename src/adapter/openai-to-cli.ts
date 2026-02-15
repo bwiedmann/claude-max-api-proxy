@@ -237,8 +237,6 @@ export function extractMessagesContent(messages: OpenAIChatRequest["messages"]):
     switch (msg.role) {
       case "system":
       case "developer":
-        // System/developer messages go to --append-system-prompt flag
-        // "developer" is OpenAI's newer role for system-level instructions
         systemParts.push(text);
         break;
       case "user":
